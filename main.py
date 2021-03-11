@@ -216,6 +216,8 @@ def main():
 
     cv2.waitKey(0)
 
+    print("end of the program.")
+
 
 if __name__ == '__main__':
     main()
