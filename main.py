@@ -28,54 +28,36 @@ def main():
 
     #and now, to import a man
     imgMan = cv2.imread("Resources/man.jpeg", 0)
-    #imgMan = cv2.resize(imgMan, (int(imgMan.shape[1] / 2), int(imgMan.shape[0] / 2)))
-
-    cv2.imshow("Grayscale", imgMan)
-    cv2.waitKey(0)
-
-    # plt.hist(imgMan.ravel(), 256, [0,256])
-    # plt.show()
-    # threshold = int(input("What should be the threshold?")) #200
-
     (thres, imgManBW) = cv2.threshold(imgMan, 230, 255, cv2.THRESH_BINARY_INV)
 
-    """
-
-    #the mother function. Dilation and Erotion are, in a way, each others inverse.
-    def dilerotion(img, kernel, dilating=True, BLForeground=False):
-        imgNew = np.zeros_like(img)
-
-        width = img.shape[1]
-        height = img.shape[0]
-
-        if (dilating^BLForeground):
-            for y in range(1, height - 1):
-                for x in range(1, width - 1):
-                    newValue = np.logical_and(img[y - 1: y + 2, x - 1: x + 2], kernel)
-                    imgNew[y, x] = np.any(newValue) * 255
-
-                if dilating:
-                    pb.printProgressBar(y, height - 2,prefix="Dilating...", length=50)
-                else:
-                    pb.printProgressBar(y, height - 2, prefix="Eroding...", length=50)
+    def erosion(img, kernel, blackForeground=False):
+        if blackForeground:
+            return dilation(img, kernel)
         else:
-            for y in range(1, height - 1):
-                for x in range(1, width - 1):
-                    newValue = np.logical_or(img[y - 1: y + 2, x - 1: x + 2], np.logical_not(kernel))
+            imgNew = np.zeros_like(img)
+
+            for y in range(1, img.shape[0] - 1):
+                for x in range(1, img.shape[1] - 1):
+                    newValue = np.bitwise_or(img[y - 1: y + 2, x - 1: x + 2], np.logical_not(kernel))
                     imgNew[y, x] = np.all(newValue) * 255
 
-                if dilating:
-                    pb.printProgressBar(y, height - 2,prefix="Dilating...", length=50)
-                else:
-                    pb.printProgressBar(y, height - 2, prefix="Eroding...", length=50)
-
-        return imgNew
+            return imgNew
 
     """
     #Dialation
     """
     def dilation(img, kernel, blackForeground=False):
-        return dilerotion(img, kernel, dilating=True, BLForeground= blackForeground)
+        if blackForeground:
+            return erosion(img, kernel)
+        else:
+            imgNew = np.zeros_like(img)
+
+            for y in range(1, img.shape[0] - 1):
+                for x in range(1, img.shape[1] - 1):
+                    newValue = np.bitwise_and(img[y - 1: y + 2, x - 1: x + 2], kernel)
+                    imgNew[y, x] = np.any(newValue) * 255
+
+            return imgNew
 
     kernel = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=np.uint8)
 
@@ -108,7 +90,17 @@ def main():
     #Erotion
     """
     def erotion(img, kernel, blackForeground=False):
-        return dilerotion(img, kernel, dilating=False, BLForeground=blackForeground)
+        if blackForeground:
+            return dilation(img, kernel)
+        else:
+            imgNew = np.zeros_like(img)
+
+            for y in range(1, img.shape[0] - 1):
+                for x in range(1, img.shape[1] - 1):
+                    newValue = np.bitwise_or(img[y - 1: y + 2, x - 1: x + 2], np.logical_not(kernel))
+                    imgNew[y, x] = np.all(newValue) * 255
+
+            return imgNew
 
     kernel = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=np.uint8)
 
@@ -122,7 +114,7 @@ def main():
     imgCV2ero = cv2.dilate(imgLeopardBW, kernel, iterations=1)
     cv2ErotionTime = (time.time() - starttime)
 
-    print(f"My own erotion function took {homebrewErotionTime} s, cv2's took {cv2ErotionTime} s.")
+    print(f"My own erosion function took {homebrewErotionTime} s, cv2's took {cv2ErotionTime} s.")
 
     cv2.imwrite("Output/LeopardErote.png", imgErote)
     cv2.imwrite("Output/LeopardEroteINV.png", imgEroteINV)
@@ -142,19 +134,19 @@ def main():
     """
 
     #like before, open and close are eachothers inverse
-    def clopen(img, kernel, iterations = 1, open = False, blackForeground=False):
-        if blackForeground^open:
+    def open(img, kernel, iterations = 1, blackForeground = False):
+        if blackForeground:
+            return close(img, kernel, iterations=iterations)
+        else:
             interim = cv2.erode(img, kernel, iterations=iterations)
             return cv2.dilate(interim, kernel, iterations=iterations)
+
+    def close(img, kernel, iterations=1, blackForeground=False):
+        if blackForeground:
+            return open(img, kernel, iterations=iterations)
         else:
             interim = cv2.dilate(img, kernel, iterations=iterations)
-            return cv2.dilate(interim, kernel, iterations=iterations)
-
-    def open(img, kernel, iterations = 1, blackForeground = False):
-        return clopen(img, kernel, iterations = iterations, open = True, blackForeground= blackForeground)
-
-    def close(img, kernel, iterations = 1, blackForeground = False):
-        return clopen(img, kernel, iterations = iterations, blackForeground= blackForeground)
+            return cv2.erode(interim, kernel, iterations=iterations)
 
     kernel = np.array([[0, 1, 0],
                        [1, 1, 1],
@@ -163,11 +155,12 @@ def main():
     imgOpened = open(imgLeopardBW, kernel)
     imgClosed = close(imgLeopardBW, kernel)
 
-    interim = close(imgOpened, kernel)
-    final = open(interim, kernel, iterations=4)
+    interim = close(imgOpened, kernel, iterations=2)
+    final = open(interim, kernel, iterations=2)
 
     cv2.imwrite("Output/LeopardOpened.png", imgOpened)
     cv2.imwrite("Output/LeopardClosed.png", imgClosed)
+    cv2.imwrite("Output/LeopardFinal.png", final)
 
     cv2.imshow("Original", imgLeopardBW)
     cv2.imshow("Opened", imgOpened)
@@ -176,7 +169,6 @@ def main():
 
     cv2.waitKey(0)
 
-    """
 
     """
     #Making a skeleton
